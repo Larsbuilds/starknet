@@ -1,1 +1,0 @@
-{"version":1,"contracts":[{"id":"l3l6p1pt8k4jm","package_name":"whiplano_starknet","contract_name":"contract","module_path":"whiplano_starknet::whiplano::contract","artifacts":{"sierra":"whiplano_starknet_unittest_contract.test.contract_class.json","casm":null}}]}
