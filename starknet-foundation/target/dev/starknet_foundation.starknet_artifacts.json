@@ -1,0 +1,1 @@
+{"version":1,"contracts":[{"id":"0p1hn9ctc9cp0","package_name":"starknet_foundation","contract_name":"contract","module_path":"starknet_foundation::starknet_foundation::contract","artifacts":{"sierra":"starknet_foundation_contract.contract_class.json","casm":null}}]}
