@@ -175,6 +175,80 @@ describe('Integration Flow', () => {
 - TypeScript support via ts-node
 - MongoDB for data persistence tests
 
+### MongoDB Service Testing
+
+The MongoDB service includes comprehensive tests for various scenarios:
+
+1. **Bulk Operations**
+   - Testing efficient handling of large batches (1000+ records)
+   - Verifying data integrity during bulk inserts
+   - Performance testing with varying batch sizes
+
+2. **Error Handling and Recovery**
+   - Testing retry logic with exponential backoff
+   - Handling partial failures in bulk operations
+   - Connection loss and recovery scenarios
+   - Invalid data handling and validation
+
+3. **Health Check Testing**
+   - Verification of both 'healthy' and 'degraded' statuses
+   - Timestamp accuracy and ordering
+   - Bulk health check operations
+   - Status transitions and history
+
+4. **Event Testing**
+   - Contract event validation
+   - Event type verification
+   - Timestamp handling
+   - Bulk event operations
+
+Example of testing bulk operations with retry logic:
+
+```typescript
+describe('Bulk Operations', () => {
+  it('should handle bulk operations with retry logic', async () => {
+    const healthChecks = generateHealthChecks(1000); // Mix of healthy/degraded
+    const result = await mongoService.saveHealthChecks(healthChecks);
+    
+    expect(result.success).to.be.true;
+    expect(result.savedCount).to.equal(1000);
+  });
+
+  it('should handle partial failures', async () => {
+    const events = [...validEvents, invalidEvent];
+    const result = await mongoService.saveContractEvents(events);
+    
+    expect(result.success).to.be.true;
+    expect(result.savedCount).to.equal(validEvents.length);
+    expect(result.failedCount).to.equal(1);
+  });
+});
+```
+
+### Recent Improvements
+
+The testing suite has been enhanced with:
+
+1. **Retry Logic Testing**
+   - Exponential backoff verification
+   - Maximum retry attempts validation
+   - Delay timing accuracy
+
+2. **Bulk Operation Resilience**
+   - Improved handling of partial failures
+   - Better error reporting and logging
+   - Individual retry attempts for failed items
+
+3. **Data Consistency**
+   - Verification of saved data integrity
+   - Order preservation testing
+   - Status consistency checks
+
+4. **Performance Testing**
+   - Large batch handling (1000+ records)
+   - Connection pool optimization
+   - Concurrent operation handling
+
 ## Best Practices
 
 1. **Test Organization**
