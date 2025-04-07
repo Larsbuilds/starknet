@@ -5,7 +5,8 @@ const { expect } = require('chai');
 const { MongoDBService } = require('../../src/services/mongodb');
 const { generateTestEvent, generateTestHealthCheck, cleanupTestData } = require('../utils/test-helpers');
 
-describe('MongoDB Service Unit Tests', () => {
+describe('MongoDB Service Unit Tests', function() {
+    this.timeout(10000); // Increase timeout for all tests in this suite
     let mongoService: any;
 
     // Connect once before all tests
@@ -14,19 +15,21 @@ describe('MongoDB Service Unit Tests', () => {
         await mongoService.connect();
     });
 
-    // Disconnect after all tests
+    // Clean up and disconnect after all tests
     after(async () => {
-        await cleanupTestData();
-        await mongoService.disconnect();
+        if (mongoService.db) {
+            await cleanupTestData();
+            await mongoService.disconnect();
+        }
     });
 
     // Clean data before each test
-    beforeEach(async () => {
-        await cleanupTestData();
-        // Reconnect if needed
+    beforeEach(async function() {
+        this.timeout(5000); // Increase timeout for cleanup operations
         if (!mongoService.db) {
             await mongoService.connect();
         }
+        await cleanupTestData();
     });
 
     describe('Connection Management', () => {

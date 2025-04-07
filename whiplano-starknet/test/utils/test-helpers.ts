@@ -36,14 +36,23 @@ function generateTestHealthCheck(status: string) {
 }
 
 async function cleanupTestData() {
-  const mongoService = MongoDBService.getInstance();
-  await mongoService.connect();
-  
-  // Clear test collections
-  await mongoService.db.collection('contract_events').deleteMany({});
-  await mongoService.db.collection('health_checks').deleteMany({});
-  
-  await mongoService.disconnect();
+  try {
+    const mongoService = MongoDBService.getInstance();
+    
+    // Only connect if not already connected
+    if (!mongoService.db) {
+      await mongoService.connect();
+    }
+    
+    // Clear test collections
+    await mongoService.db.collection('contract_events').deleteMany({});
+    await mongoService.db.collection('health_checks').deleteMany({});
+    
+    // Don't disconnect here - let the test suite manage connections
+  } catch (error) {
+    console.error('Error during test cleanup:', error);
+    throw error;
+  }
 }
 
 module.exports = {
