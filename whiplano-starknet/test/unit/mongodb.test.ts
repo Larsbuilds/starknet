@@ -178,22 +178,175 @@ describe('MongoDB Service Unit Tests', function() {
             expect(retrieveTime).to.be.lessThan(500, 'Health check retrieval operation took too long');
         });
 
-        it('should handle bulk operations efficiently', async () => {
+        it('should handle bulk health check operations efficiently', async function() {
+            this.timeout(15000); // Increase timeout for bulk operations
+            
+            // Generate 100 health checks with alternating statuses
+            const healthChecks = Array(100).fill(null).map((_, i) => 
+                generateTestHealthCheck(i % 2 === 0 ? 'healthy' : 'degraded')
+            );
+            
+            // Bulk insert all health checks at once
             const startTime = Date.now();
+            await mongoService.saveHealthChecks(healthChecks);
+            const bulkSaveTime = Date.now() - startTime;
+            expect(bulkSaveTime).to.be.lessThan(3000, 'Bulk health check save operations took too long');
+
+            // Verify all health checks were saved
+            const retrieveStart = Date.now();
+            const retrievedChecks = await mongoService.getHealthHistory(100);
+            const bulkRetrieveTime = Date.now() - retrieveStart;
+            expect(retrievedChecks).to.have.lengthOf(100);
+            expect(bulkRetrieveTime).to.be.lessThan(1000, 'Bulk health check retrieval took too long');
+
+            // Verify health checks are in correct order and have correct statuses
+            for (let i = 0; i < 100; i++) {
+                const expectedStatus = (99 - i) % 2 === 0 ? 'healthy' : 'degraded';
+                expect(retrievedChecks[i].status).to.equal(expectedStatus);
+            }
+        });
+
+        it('should handle bulk operations efficiently', async function() {
+            this.timeout(15000); // Increase timeout for bulk operations
+            
+            // Generate 100 events
             const events = Array(100).fill(null).map((_, i) => 
                 generateTestEvent(`BulkTest${i}`)
             );
             
-            for (const event of events) {
-                await mongoService.saveContractEvent(event);
-            }
+            // Bulk insert all events at once
+            const startTime = Date.now();
+            await mongoService.saveContractEvents(events);
             const bulkSaveTime = Date.now() - startTime;
-            expect(bulkSaveTime).to.be.lessThan(6000, 'Bulk event save operations took too long');
+            expect(bulkSaveTime).to.be.lessThan(3000, 'Bulk event save operations took too long');
+
+            // Verify all events were saved
+            const retrieveStart = Date.now();
+            const retrievedEvents = await mongoService.getRecentEvents(100);
+            const bulkRetrieveTime = Date.now() - retrieveStart;
+            expect(retrievedEvents).to.have.lengthOf(100);
+            expect(bulkRetrieveTime).to.be.lessThan(1000, 'Bulk event retrieval took too long');
+
+            // Verify events are in correct order
+            for (let i = 0; i < 100; i++) {
+                expect(retrievedEvents[i].eventType).to.equal(`BulkTest${99 - i}`);
+            }
+        });
+
+        it('should handle bulk operations with 500 events efficiently', async function() {
+            this.timeout(30000);
+            
+            const events = Array(500).fill(null).map((_, i) => 
+                generateTestEvent(`BulkTest500_${i}`)
+            );
+            
+            const startTime = Date.now();
+            await mongoService.saveContractEvents(events);
+            const bulkSaveTime = Date.now() - startTime;
+            expect(bulkSaveTime).to.be.lessThan(5000);
 
             const retrieveStart = Date.now();
-            await mongoService.getRecentEvents(100);
+            const retrievedEvents = await mongoService.getRecentEvents(500);
             const bulkRetrieveTime = Date.now() - retrieveStart;
-            expect(bulkRetrieveTime).to.be.lessThan(1000, 'Bulk event retrieval took too long');
+            expect(retrievedEvents).to.have.lengthOf(500);
+            expect(bulkRetrieveTime).to.be.lessThan(2000);
+        });
+
+        it('should handle bulk operations with 1000 health checks efficiently', async function() {
+            this.timeout(45000);
+            
+            const healthChecks = Array(1000).fill(null).map((_, i) => 
+                generateTestHealthCheck(i % 2 === 0 ? 'healthy' : 'degraded')
+            );
+            
+            const startTime = Date.now();
+            await mongoService.saveHealthChecks(healthChecks);
+            const bulkSaveTime = Date.now() - startTime;
+            expect(bulkSaveTime).to.be.lessThan(8000);
+
+            const retrieveStart = Date.now();
+            const retrievedChecks = await mongoService.getHealthHistory(1000);
+            const bulkRetrieveTime = Date.now() - retrieveStart;
+            expect(retrievedChecks).to.have.lengthOf(1000);
+            expect(bulkRetrieveTime).to.be.lessThan(3000);
+        });
+    });
+
+    describe('Error Handling', () => {
+        it('should handle partial failures in bulk event operations', async function() {
+            this.timeout(15000);
+            
+            const validEvents = Array(5).fill(null).map((_, i) => 
+                generateTestEvent(`ValidEvent_${i}`)
+            );
+            
+            // Create an invalid event (missing required field)
+            const invalidEvent = { ...generateTestEvent('InvalidEvent') };
+            delete invalidEvent.eventType;
+            
+            const events = [...validEvents, invalidEvent];
+            
+            try {
+                await mongoService.saveContractEvents(events);
+                throw new Error('Expected error was not thrown');
+            } catch (error) {
+                expect(error).to.be.an('error');
+                // Verify that valid events were still saved
+                const savedEvents = await mongoService.getRecentEvents(5);
+                expect(savedEvents).to.have.lengthOf(5);
+                expect(savedEvents[0].eventType).to.equal('ValidEvent_4');
+            }
+        });
+
+        it('should handle partial failures in bulk health check operations', async function() {
+            this.timeout(15000);
+            
+            const validChecks = Array(5).fill(null).map((_, i) => 
+                generateTestHealthCheck(i % 2 === 0 ? 'healthy' : 'degraded')
+            );
+            
+            // Create an invalid health check (missing required field)
+            const invalidCheck = { ...generateTestHealthCheck('healthy') };
+            delete invalidCheck.status;
+            
+            const healthChecks = [...validChecks, invalidCheck];
+            
+            try {
+                await mongoService.saveHealthChecks(healthChecks);
+                throw new Error('Expected error was not thrown');
+            } catch (error) {
+                expect(error).to.be.an('error');
+                // Verify that valid health checks were still saved
+                const savedChecks = await mongoService.getHealthHistory(5);
+                expect(savedChecks).to.have.lengthOf(5);
+                // Check that both statuses are present
+                const statuses = savedChecks.map(check => check.status);
+                expect(statuses).to.include('healthy');
+                expect(statuses).to.include('degraded');
+            }
+        });
+
+        it('should handle connection loss during bulk operations', async function() {
+            this.timeout(15000);
+            
+            const events = Array(50).fill(null).map((_, i) => 
+                generateTestEvent(`ConnectionTest_${i}`)
+            );
+            
+            // Simulate connection loss by disconnecting after starting the operation
+            const savePromise = mongoService.saveContractEvents(events);
+            await mongoService.disconnect();
+            
+            try {
+                await savePromise;
+                throw new Error('Expected error was not thrown');
+            } catch (error) {
+                expect(error).to.be.an('error');
+                // Reconnect and verify no events were saved
+                await mongoService.connect();
+                const savedEvents = await mongoService.getRecentEvents(50);
+                expect(savedEvents).to.have.lengthOf(0);
+            }
         });
     });
 }); 

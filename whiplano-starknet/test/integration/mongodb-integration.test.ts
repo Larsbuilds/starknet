@@ -8,15 +8,29 @@ const { generateTestEvent, generateTestHealthCheck, cleanupTestData } = require(
 describe('MongoDB Integration Tests', () => {
     let mongoService: any;
 
-    before(async () => {
-        await cleanupTestData();
-        mongoService = MongoDBService.getInstance();
-        await mongoService.connect();
+    before(async function() {
+        this.timeout(10000); // 10 second timeout
+        try {
+            await cleanupTestData();
+            mongoService = MongoDBService.getInstance();
+            await mongoService.connect();
+            console.log('MongoDB connection established for integration tests');
+        } catch (error) {
+            console.error('Failed to setup integration tests:', error);
+            throw error;
+        }
     });
 
-    after(async () => {
-        await cleanupTestData();
-        await mongoService.disconnect();
+    after(async function() {
+        this.timeout(5000); // 5 second timeout
+        try {
+            await cleanupTestData();
+            await mongoService.disconnect();
+            console.log('MongoDB connection closed for integration tests');
+        } catch (error) {
+            console.error('Failed to cleanup integration tests:', error);
+            throw error;
+        }
     });
 
     describe('Event Lifecycle', () => {
